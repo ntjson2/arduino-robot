@@ -5,6 +5,12 @@
 // Ultrasonic setup ------------------------------------------
 const int trigPin = 9;
 const int echoPin = 10;
+long objDistance[] = {0,0}; // For comparing the current distance to the previous distance
+// The maximum distance the object can be from the sensor to be considered a verifiable object
+long maxObjDistance = 100; 
+long minObjDistance = 10;
+bool stoppedFromObject = false; // Boolean to check if the object is too close to the sensor
+
 
 // Servo setup ------------------------------------------
 Servo servo;
@@ -28,9 +34,65 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motorLeft = AFMS.getMotor(4);
 Adafruit_DCMotor *motorRight = AFMS.getMotor(3);
 
-voit initUltrasound(){
+void initUltrasound(){
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
+}
+
+void CheckUltraSound(){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration, distance_inches, distance_cm;
+  duration = pulseIn(echoPin, HIGH);
+  //distance_inches = microsSectionstoInches(duration);
+  distance_cm = microsSectionstoCentemers(duration);
+ /*  Serial.print(distance_inches);
+  Serial.print(" in, "); */
+
+  Serial.print(distance_cm);
+  Serial.print(" cm, ");
+  Serial.println();
+
+  //Set global variable objDistance to the distance in cm
+  objDistance[0] = objDistance[1]; // Update the previous distance
+  objDistance[1] = distance_cm; // Update the current distance
+  delay(100);
+}
+
+void CheckObjectDistance(){
+
+  // If the current object measurement is 0, return
+  if(objDistance[1] == 0){
+    return;
+  }
+
+  // If the object is too far away, reset the object distance
+  if(objDistance[1] > maxObjDistance){
+    objDistance[0] = 0;
+    objDistance[1] = 0;
+    return;
+  }
+
+  //If the current object is closer or equal to the minimum object distance, stop the motors
+  if(objDistance[1] <= minObjDistance){
+    MotorForward(0);
+    stoppedFromObject = true;
+    return;
+  }
+    
+  // If the current object is future than the previous object, speed up the motors  
+  if(objDistance[1] > objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
+    MotorForward(120);
+  }
+  // If current object distance is less than the previous object distance, slow down the motors
+  else if(objDistance[1] < objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
+    MotorForward(100);
+  }
+
 }
 
 void setup() {
@@ -50,14 +112,15 @@ void loop() {
   // Check if there is a crosswalk with the servo
   //bool sd = VerifyCrosswalkWithServo();
   checkIRSensors();
-  delay(3000); 
+  //delay(3000); 
   resetIRSensors();
+  CheckUltraSound();
+
 }
 
 
 // Initialize the motors
 void initMotors(){
-  AFMS.begin();
   // Initialize the DC motors, start with the Adafruit_MotorShield
   AFMS.begin();
 
@@ -72,24 +135,32 @@ void initMotors(){
 
 
 void MotorTurnLeft(uint8_t speed){
-  motorLeft->run(BACKWARD); // left backwards
-  motorRight->run(FORWARD);// right forward
-  motorLeft->setSpeed(speed);
+  motorLeft->run(FORWARD); // left backwards
+  motorRight->run(BACKWARD);// right forward
+  motorLeft->setSpeed(0);
   motorRight->setSpeed(speed);
 }
 
 
-void MotorTurnRightLeft(uint8_t speed){
-  motorLeft->run(BACKWARD); // left backwards
-  motorRight->run(FORWARD);// right forward
+void MotorTurnRight(uint8_t speed){
+  motorLeft->run(FORWARD); // left backwards
+  motorRight->run(BACKWARD);// right forward
   motorLeft->setSpeed(speed);
-  motorRight->setSpeed(speed);
+  motorRight->setSpeed(0);
 }
 
 // This code is to move the motors forward
 void MotorForward(uint8_t i){
   motorLeft->run(FORWARD);
   motorRight->run(BACKWARD);
+  motorLeft->setSpeed(i);
+  motorRight->setSpeed(i);
+}
+
+// This code is to move the motors forward
+void MotorBackward(uint8_t i){
+  motorLeft->run(BACKWARD);
+  motorRight->run(FORWARD);
   motorLeft->setSpeed(i);
   motorRight->setSpeed(i);
 }
