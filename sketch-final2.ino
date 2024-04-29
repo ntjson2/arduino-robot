@@ -20,80 +20,27 @@ int angle = 1;
 // IR dectectors IRLeft_Value, IRFront_Value, IRRight_Value
 int analogPin1 = A1;
 int IRLeft_Value =0;
-
 int analogPin2 = A2;
 int IRFront_Value =0;
-
 int analogPin3 = A3;
 int IRRight_Value =0;
-// Boolean array to check if IR sensors are blocked
-bool[] IRBlocked = {false, false, false};
+int analogPin3 = A4;
+int IRBackRight_Value =0;
+
+// Int array to check IR sensor data, yellow vs white vs black, etc
+int[] IRBlocked = {0, 0, 0, 0};
 
 // Motor setup ------------------------------------------
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *motorLeft = AFMS.getMotor(4);
 Adafruit_DCMotor *motorRight = AFMS.getMotor(3);
+// Direction of the motors, Forward or Backward, 
+//Forward is the default, Forward = true, Backward = false
+bool isForward = true;
+// Motor speed, default is 150
+int motorSpeed = 150;
 
-void initUltrasound(){
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-}
 
-void CheckUltraSound(){
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-
-  long duration, distance_inches, distance_cm;
-  duration = pulseIn(echoPin, HIGH);
-  //distance_inches = microsSectionstoInches(duration);
-  distance_cm = microsSectionstoCentemers(duration);
- /*  Serial.print(distance_inches);
-  Serial.print(" in, "); */
-
-  Serial.print(distance_cm);
-  Serial.print(" cm, ");
-  Serial.println();
-
-  //Set global variable objDistance to the distance in cm
-  objDistance[0] = objDistance[1]; // Update the previous distance
-  objDistance[1] = distance_cm; // Update the current distance
-  delay(100);
-}
-
-void CheckObjectDistance(){
-
-  // If the current object measurement is 0, return
-  if(objDistance[1] == 0){
-    return;
-  }
-
-  // If the object is too far away, reset the object distance
-  if(objDistance[1] > maxObjDistance){
-    objDistance[0] = 0;
-    objDistance[1] = 0;
-    return;
-  }
-
-  //If the current object is closer or equal to the minimum object distance, stop the motors
-  if(objDistance[1] <= minObjDistance){
-    MotorForward(0);
-    stoppedFromObject = true;
-    return;
-  }
-    
-  // If the current object is future than the previous object, speed up the motors  
-  if(objDistance[1] > objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
-    MotorForward(120);
-  }
-  // If current object distance is less than the previous object distance, slow down the motors
-  else if(objDistance[1] < objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
-    MotorForward(100);
-  }
-
-}
 
 void setup() {
   // Fire up the serial monitor
@@ -103,8 +50,7 @@ void setup() {
   //Initialize the servo with IR sensor attached.
   initServo();
   // Initialize the motors
-  initMotors();
-  
+  initMotors();  
 }
 
 void loop() {
@@ -124,11 +70,11 @@ void initMotors(){
   // Initialize the DC motors, start with the Adafruit_MotorShield
   AFMS.begin();
 
-  motorLeft->setSpeed(150);
+  motorLeft->setSpeed(motorSpeed);
   motorLeft->run(FORWARD);
   motorLeft->run(RELEASE);
 
-  motorRight->setSpeed(150);
+  motorRight->setSpeed(motorSpeed);
   motorRight->run(BACKWARD);
   motorRight->run(RELEASE);  
 }
@@ -206,22 +152,28 @@ void checkIRSensors(){
   IRLeft_Value = analogRead(analogPin1);
   IRFront_Value = analogRead(analogPin2);
   IRRight_Value = analogRead(analogPin3);
+  IRBackRight_Value = analogRead(analogPin4);
 
   Serial.println(IRLeft_Value);
   Serial.println(IRFront_Value);
   Serial.println(IRRight_Value);
+  Serial.println(IRBackRight_Value);
 
   if(IRLeft_Value < 100){
     Serial.println("IR Left Sensor is blocked");
-    IRBlocked[0]=true;
+    IRBlocked[0]=IRLeft_Value;
   }
   if(IRFront_Value < 100){
     Serial.println("IR Front Sensor is blocked");
-    IRBlocked[1]=true;
+    IRBlocked[1]=IRFront_Value;
   }
   if(IRRight_Value < 100){
     Serial.println("IR Right Sensor is blocked");
-    IRBlocked[2]=true;
+    IRBlocked[2]=IRRight_Value;
+  }
+  if(IRBackRight_Value < 100){
+    Serial.println("IR Back Right Sensor is blocked");
+    IRBlocked[2]=IRBackRight_Value;
   }
 }
 
@@ -229,6 +181,66 @@ void checkIRSensors(){
 void resetIRSensors(){
   for(int i=0; i<3; i++){
     IRBlocked[i]=false;
+  }
+}
+
+
+void initUltrasound(){
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
+
+void CheckUltraSound(){
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration, distance_inches, distance_cm;
+  duration = pulseIn(echoPin, HIGH);
+  //distance_inches = microsSectionstoInches(duration);
+  distance_cm = microsSectionstoCentemers(duration);
+ /*  Serial.print(distance_inches);
+  Serial.print(" in, "); */
+
+  Serial.print(distance_cm);
+  Serial.print(" cm, ");
+  Serial.println();
+
+  //Set global variable objDistance to the distance in cm
+  objDistance[0] = objDistance[1]; // Update the previous distance
+  objDistance[1] = distance_cm; // Update the current distance
+  delay(100);
+}
+
+void CheckObjectDistance(){
+  // If the current object measurement is 0, return
+  if(objDistance[1] == 0){
+    return;
+  }
+
+  // If the object is too far away, reset the object distance
+  if(objDistance[1] > maxObjDistance){
+    objDistance[0] = 0;
+    objDistance[1] = 0;
+    return;
+  }
+
+  //If the current object is closer or equal to the minimum object distance, stop the motors
+  if(objDistance[1] <= minObjDistance){
+    MotorForward(0);
+    stoppedFromObject = true;
+    return;
+  }
+    
+  // If the current object is future than the previous object, speed up the motors  
+  if(objDistance[1] > objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
+    MotorForward(120);
+  }
+  // If current object distance is less than the previous object distance, slow down the motors
+  else if(objDistance[1] < objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
+    MotorForward(100);
   }
 }
  
