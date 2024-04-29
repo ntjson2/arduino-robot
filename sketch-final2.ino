@@ -2,6 +2,10 @@
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
 
+// Ultrasonic setup ------------------------------------------
+const int trigPin = 9;
+const int echoPin = 10;
+
 // Servo setup ------------------------------------------
 Servo servo;
 int angle = 1;
@@ -21,14 +25,19 @@ bool[] IRBlocked = {false, false, false};
 
 // Motor setup ------------------------------------------
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *myMotor = AFMS.getMotor(4);
-Adafruit_DCMotor *myMotor3 = AFMS.getMotor(3);
+Adafruit_DCMotor *motorLeft = AFMS.getMotor(4);
+Adafruit_DCMotor *motorRight = AFMS.getMotor(3);
 
-
+voit initUltrasound(){
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
 
 void setup() {
   // Fire up the serial monitor
   Serial.begin(9600);
+  // Initialize the ultrasound sensor
+  initUltrasound();
   //Initialize the servo with IR sensor attached.
   initServo();
   // Initialize the motors
@@ -45,10 +54,6 @@ void loop() {
   resetIRSensors();
 }
 
-void MoveForward(){
-  myMotor->run(FORWARD);
-  myMotor3->run(BACKWARD);
-}
 
 // Initialize the motors
 void initMotors(){
@@ -56,31 +61,38 @@ void initMotors(){
   // Initialize the DC motors, start with the Adafruit_MotorShield
   AFMS.begin();
 
-  myMotor->setSpeed(150);
-  myMotor->run(FORWARD);
-  myMotor->run(RELEASE);
+  motorLeft->setSpeed(150);
+  motorLeft->run(FORWARD);
+  motorLeft->run(RELEASE);
 
-  myMotor3->setSpeed(150);
-  myMotor3->run(BACKWARD);
-  myMotor3->run(RELEASE);  
+  motorRight->setSpeed(150);
+  motorRight->run(BACKWARD);
+  motorRight->run(RELEASE);  
 }
 
 
 void MotorTurnLeft(uint8_t speed){
-  myMotor->run(BACKWARD); // left backwards
-  myMotor3->run(FORWARD);// right forward
-  myMotor->setSpeed(speed);
-  myMotor3->setSpeed(speed);
+  motorLeft->run(BACKWARD); // left backwards
+  motorRight->run(FORWARD);// right forward
+  motorLeft->setSpeed(speed);
+  motorRight->setSpeed(speed);
+}
+
+
+void MotorTurnRightLeft(uint8_t speed){
+  motorLeft->run(BACKWARD); // left backwards
+  motorRight->run(FORWARD);// right forward
+  motorLeft->setSpeed(speed);
+  motorRight->setSpeed(speed);
 }
 
 // This code is to move the motors forward
 void MotorForward(uint8_t i){
- myMotor->run(FORWARD);
-  myMotor3->run(BACKWARD);
-   myMotor->setSpeed(i);
-    myMotor3->setSpeed(i);
+  motorLeft->run(FORWARD);
+  motorRight->run(BACKWARD);
+  motorLeft->setSpeed(i);
+  motorRight->setSpeed(i);
 }
-
 
 
 // This code is to control the servo 
@@ -123,6 +135,7 @@ void checkIRSensors(){
   IRLeft_Value = analogRead(analogPin1);
   IRFront_Value = analogRead(analogPin2);
   IRRight_Value = analogRead(analogPin3);
+
   Serial.println(IRLeft_Value);
   Serial.println(IRFront_Value);
   Serial.println(IRRight_Value);
