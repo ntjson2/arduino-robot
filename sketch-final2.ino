@@ -149,6 +149,9 @@ bool VerifyCrosswalkWithServo(){
 // Check the IR sensors to see if they are blocked, 
 //then set the IRBlocked array to true if one or many are blocked
 void checkIRSensors(){
+  
+  int yellowRange[] = {100, 200};
+
   IRLeft_Value = analogRead(analogPin1);
   IRFront_Value = analogRead(analogPin2);
   IRRight_Value = analogRead(analogPin3);
