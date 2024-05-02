@@ -240,7 +240,7 @@ void CorrectMovementFromIRsensor(){
       MotorForward(150);
       return;
     } else if (isCrosswalk == true) {
-      for (i = 1; i < 50; i++) {
+      for (int i = 1; i < 50; i++) {
         delay(100);
         obsTimer++;
       }
@@ -291,7 +291,7 @@ void CheckUltraSound(){
     obsTimer++;
   }
   if (obsTimer == 100) {
-    MotorUturn();
+    MotorUTurn();
     obsTimer = 0; //reset
     stoppedFromObject == false;
   }
