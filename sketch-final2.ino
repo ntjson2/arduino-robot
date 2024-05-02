@@ -48,7 +48,8 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 bool isForward = true;
 
 // Motor speed, default is 150
-int motorSpeed = 200;
+int motorSpeed = 250;
+
 
 // Basic previous direction states
 // Came from: 0 = start, 1 = right, 2 = left, 3 = left turn intersection, 
@@ -56,7 +57,7 @@ int motorSpeed = 200;
 int prevState = 0;
 
 // Default delay for turn correction
-int turnDelay = 50;
+int turnDelay = 10;
 
 int yellowRange[] = {100, 200};
 int whiteInt = 200;
@@ -74,7 +75,7 @@ void initMotors(){
   // Initialize the DC motors, start with the Adafruit_MotorShield
   AFMS.begin();
 
-  motorLeft->setSpeed(motorSpeed);
+  motorLeft->setSpeed(motorSpeed * 0.75) ;
   motorLeft->run(FORWARD);
   motorLeft->run(RELEASE);
 
@@ -176,18 +177,20 @@ void checkIRSensors(){
 // Correct the movement of the robot if the IR sensors are blocked
 void CorrectMovementFromIRsensor(){
 
-  
+  Serial.print("IR[1] Right Sensor: ");
+  Serial.print(IRBlocked[1]);
+  Serial.println(" . ");
 
    // If servo  is blocked stop
-  if((IRBlocked[1] < whiteInt)){
+  if((IRBlocked[1] < whiteInt && IRBlocked[0] < whiteInt) && (IRBlocked[2] < whiteInt)){
     MotorForward(0);
     Serial.println("Servo stop");
     resetIRSensors();
 
      //wait check for crosswalk
-    delay(5000);
+    delay(10);
    
-    MotorUTurn();
+    //MotorUTurn();
     return;
   }
  
@@ -210,7 +213,7 @@ void CorrectMovementFromIRsensor(){
 
    // If left is unblocked, turn left
   if(IRBlocked[2] < whiteInt){
-    MotorTurnLeft(motorSpeed);
+    MotorTurnLeft(motorSpeed * 0.75);
     Serial.println("Turning Left");
     resetIRSensors();
     MotorForward(motorSpeed);
@@ -240,7 +243,7 @@ void CorrectMovementFromIRsensor(){
 void MotorForward(uint8_t i){
   motorLeft->run(BACKWARD);
   motorRight->run(FORWARD);
-  motorLeft->setSpeed(i);
+  motorLeft->setSpeed(i * 0.75);
   motorRight->setSpeed(i);
 }
 
@@ -250,7 +253,7 @@ void MotorTurnLeft(uint8_t speed){
   motorLeft->run(BACKWARD); // left backwards
   motorRight->run(BACKWARD);// right forward
  
-  motorLeft->setSpeed(speed);
+  motorLeft->setSpeed(speed * 0.75);
   motorRight->setSpeed(speed);
   lcd.clear();
   lcd.print("UTURN");
@@ -263,7 +266,7 @@ void MotorTurnRight(uint8_t speed){
   motorLeft->run(FORWARD); // left backwards
   motorRight->run(FORWARD);// right forward  
  
-  motorLeft->setSpeed(speed);
+  motorLeft->setSpeed(speed * 0.75);
   motorRight->setSpeed(speed);
   delay(turnDelay); 
 }
