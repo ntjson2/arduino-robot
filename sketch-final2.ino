@@ -18,16 +18,17 @@ int angle = 1;
 
 // IR setup ------------------------------------------
 // IR dectectors IRLeft_Value, IRFront_Value, IRRight_Value
-int analogPin1 = A1;
+int analogPin0 = A0;
 int IRLeft_Value =0;
-int analogPin2 = A2;
+int analogPin1 = A1;
 int IRFront_Value =0;
-int analogPin3 = A3;
+int analogPin2 = A2;
 int IRRight_Value =0;
-int analogPin4 = A4;
-int IRBackRight_Value =0;
+int analogPin3 = A3;
+int IRBackLeft_Value =0;
 
 // Int array to check IR sensor data, yellow vs white vs black, etc
+// ORDER: Right 0, Front 1, Left 2, BackLeft 3
 int IRBlocked[] = {0, 0, 0, 0};
 
 // Motor setup ------------------------------------------
@@ -82,17 +83,13 @@ void setup() {
 }
 
 void loop() {
-
   // Check if there is a crosswalk with the servo
-  //bool sd = VerifyCrosswalkWithServo();
   checkIRSensors();
-  //delay(3000); 
-  resetIRSensors();
-  CheckUltraSound();
-
+  delay(1000); 
+  
+  //resetIRSensors();
+  //CheckUltraSound();
 }
-
-
 
 
 void MotorTurnLeft(uint8_t speed){
@@ -135,12 +132,13 @@ bool VerifyCrosswalkWithServo(){
     servo.write(angle);
       if(angle > 16){
 
-        IRFront_Value = analogRead(analogPin2);
+        IRFront_Value = analogRead(analogPin1);
         if(IRFront_Value < 100){
           Serial.println("IR Sensor is blocked");
           return true;   
         }
       }
+    //   
     delay(15);
     }
   
@@ -161,33 +159,45 @@ bool VerifyCrosswalkWithServo(){
 void checkIRSensors(){
   
   int yellowRange[] = {100, 200};
+  int whiteInt = 200;
 
-  IRLeft_Value = analogRead(analogPin1);
-  IRFront_Value = analogRead(analogPin2);
-  IRRight_Value = analogRead(analogPin3);
-  IRBackRight_Value = analogRead(analogPin4);
+  IRRight_Value = analogRead(analogPin0);
+  IRFront_Value = analogRead(analogPin1);
+  IRLeft_Value = analogRead(analogPin2);
+  IRBackLeft_Value = analogRead(analogPin3);
 
-  Serial.println(IRLeft_Value);
-  Serial.println(IRFront_Value);
+  Serial.print("IR[0] Right Sensor: ");
   Serial.println(IRRight_Value);
-  Serial.println(IRBackRight_Value);
 
-  if(IRLeft_Value < 100){
-    Serial.println("IR Left Sensor is blocked");
-    IRBlocked[0]=IRLeft_Value;
+  Serial.print("IR[1] Front SERVO: ");
+  Serial.println(IRFront_Value);
+
+  Serial.print("IR[2] Left Sensor: ");
+  Serial.println(IRLeft_Value);
+ 
+  Serial.print("IR[3] BackL Sensor: ");
+  Serial.println(IRBackLeft_Value);
+
+ 
+  if(IRRight_Value < whiteInt){
+    Serial.println("IR Right Sensor is blocked");
+    IRBlocked[0]=IRRight_Value;
   }
-  if(IRFront_Value < 100){
-    Serial.println("IR Front Sensor is blocked");
+  if(IRFront_Value < whiteInt){
+    Serial.println("IR Front SERVO is blocked");
     IRBlocked[1]=IRFront_Value;
   }
-  if(IRRight_Value < 100){
-    Serial.println("IR Right Sensor is blocked");
-    IRBlocked[2]=IRRight_Value;
+   if(IRLeft_Value < whiteInt){
+    Serial.println("IR Left Sensor is blocked");
+    IRBlocked[2]=IRLeft_Value;
+  } 
+  if(IRBackLeft_Value < whiteInt){
+    Serial.println("IR Back Left Sensor is blocked");
+    IRBlocked[3]=IRBackLeft_Value;
   }
-  if(IRBackRight_Value < 100){
-    Serial.println("IR Back Right Sensor is blocked");
-    IRBlocked[2]=IRBackRight_Value;
-  }
+
+   Serial.println("----------------------");
+   Serial.println(". ");
 }
 
 // Reset the IR sensors to false
@@ -198,6 +208,35 @@ void resetIRSensors(){
 }
 
 
+// Correct the movement of the robot if the IR sensors are blocked
+void CorrectMovementFromIRsensor(){
+
+  // If all three sensors are blocked (front, left, right), stop, check for crosswalk
+  if(IRBlocked[0] && IRBlocked[1] && IRBlocked[2]){
+    MotorForward(0);
+    VerifyCrosswalkWithServo();
+    return;
+  }
+
+  // If the left and right sensors are blocked keep moving straight ahead
+  if(IRBlocked[0] && IRBlocked[2]){
+    MotorForward(150);
+    return;
+  }
+
+  // If left is unblocked, turn left
+  if(!IRBlocked[0]){
+    MotorTurnLeft(150);
+    return;
+  }
+
+  // If right is unblocked, turn right
+  if(!IRBlocked[2]){
+    MotorTurnRight(150);
+    return;
+  }
+ 
+}
 
 void CheckUltraSound(){
 
