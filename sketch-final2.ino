@@ -37,7 +37,7 @@ int IRBackLeft_Value =0;
 
 // Int array to check IR sensor data, yellow vs white vs black, etc
 // ORDER: Right 0, Front 1, Left 2, BackLeft 3
-int IRBlocked[] = {0, 0, 0, 0};
+int IRBlocked[] = {1000, 1000, 1000, 1000};
 
 // Motor setup ------------------------------------------
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -48,7 +48,7 @@ Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 bool isForward = true;
 
 // Motor speed, default is 150
-int motorSpeed = 150;
+int motorSpeed = 200;
 
 // Basic previous direction states
 // Came from: 0 = start, 1 = right, 2 = left, 3 = left turn intersection, 
@@ -118,7 +118,7 @@ void loop() {
    
   CorrectMovementFromIRsensor();
 
-  //resetIRSensors();
+ 
   //CheckUltraSound();
 }
 
@@ -176,11 +176,18 @@ void checkIRSensors(){
 // Correct the movement of the robot if the IR sensors are blocked
 void CorrectMovementFromIRsensor(){
 
-   // If servo is blocked stop
-  if(IRBlocked[1] < whiteInt){
+  
+
+   // If servo  is blocked stop
+  if((IRBlocked[1] < whiteInt)){
     MotorForward(0);
     Serial.println("Servo stop");
     resetIRSensors();
+
+     //wait check for crosswalk
+    delay(5000);
+   
+    MotorUTurn();
     return;
   }
  
@@ -239,8 +246,9 @@ void MotorForward(uint8_t i){
 
 
 void MotorTurnLeft(uint8_t speed){
-  motorLeft->run(FORWARD); // left backwards
-  motorRight->run(FORWARD);// right forward  
+  
+  motorLeft->run(BACKWARD); // left backwards
+  motorRight->run(BACKWARD);// right forward
  
   motorLeft->setSpeed(speed);
   motorRight->setSpeed(speed);
@@ -251,8 +259,10 @@ void MotorTurnLeft(uint8_t speed){
 
 
 void MotorTurnRight(uint8_t speed){
-   motorLeft->run(BACKWARD); // left backwards
-  motorRight->run(BACKWARD);// right forward
+
+  motorLeft->run(FORWARD); // left backwards
+  motorRight->run(FORWARD);// right forward  
+ 
   motorLeft->setSpeed(speed);
   motorRight->setSpeed(speed);
   delay(turnDelay); 
@@ -271,6 +281,7 @@ void MotorBackward(uint8_t i){
 
 //This code is to uturn
 void MotorUTurn(){
+  Serial.println("UTURN");
   for(int i=0; i<5; i++){
     MotorTurnRight(motorSpeed);
   }
