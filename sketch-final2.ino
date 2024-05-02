@@ -24,11 +24,11 @@ int analogPin2 = A2;
 int IRFront_Value =0;
 int analogPin3 = A3;
 int IRRight_Value =0;
-int analogPin3 = A4;
+int analogPin4 = A4;
 int IRBackRight_Value =0;
 
 // Int array to check IR sensor data, yellow vs white vs black, etc
-int[] IRBlocked = {0, 0, 0, 0};
+int IRBlocked[] = {0, 0, 0, 0};
 
 // Motor setup ------------------------------------------
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
@@ -40,6 +40,34 @@ bool isForward = true;
 // Motor speed, default is 150
 int motorSpeed = 150;
 
+
+// Function to initialize the ultrasound sensor
+void initUltrasound() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
+
+
+// Initialize the motors
+void initMotors(){
+  // Initialize the DC motors, start with the Adafruit_MotorShield
+  AFMS.begin();
+
+  motorLeft->setSpeed(motorSpeed);
+  motorLeft->run(FORWARD);
+  motorLeft->run(RELEASE);
+
+  motorRight->setSpeed(motorSpeed);
+  motorRight->run(BACKWARD);
+  motorRight->run(RELEASE);  
+}
+
+
+// This code is to control the servo 
+void initServo(){
+  servo.attach(10);
+  servo.write(angle);
+}
 
 
 void setup() {
@@ -65,19 +93,6 @@ void loop() {
 }
 
 
-// Initialize the motors
-void initMotors(){
-  // Initialize the DC motors, start with the Adafruit_MotorShield
-  AFMS.begin();
-
-  motorLeft->setSpeed(motorSpeed);
-  motorLeft->run(FORWARD);
-  motorLeft->run(RELEASE);
-
-  motorRight->setSpeed(motorSpeed);
-  motorRight->run(BACKWARD);
-  motorRight->run(RELEASE);  
-}
 
 
 void MotorTurnLeft(uint8_t speed){
@@ -111,13 +126,6 @@ void MotorBackward(uint8_t i){
   motorRight->setSpeed(i);
 }
 
-
-// This code is to control the servo 
-void initServo(){
-  servo.attach(10);
-  servo.write(angle);
-}
-
 // This code is to control the servo by turning it out until it reaches 46 degrees, 
 // then checks the IR sensor to see if it is blocked. If it is blocked, it will turn back return true
 // showing there is a crosswalk. If it is not blocked, it will 
@@ -125,15 +133,17 @@ void initServo(){
 bool VerifyCrosswalkWithServo(){  
   for(angle=0; angle < 46; angle += 2){
     servo.write(angle);
-    if(angle > 16){
+      if(angle > 16){
 
-      IRFront_Value = analogRead(analogPin2);
-      if(IRFront_Value < 100){
-        Serial.println("IR Sensor is blocked");
-        return true;   
-    }
+        IRFront_Value = analogRead(analogPin2);
+        if(IRFront_Value < 100){
+          Serial.println("IR Sensor is blocked");
+          return true;   
+        }
+      }
     delay(15);
-  }
+    }
+  
 
   for(angle=46; angle > 0; angle -=2){
     servo.write(angle);
@@ -188,22 +198,19 @@ void resetIRSensors(){
 }
 
 
-void initUltrasound(){
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-}
 
 void CheckUltraSound(){
+
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
 
-  long duration, distance_inches, distance_cm;
-  duration = pulseIn(echoPin, HIGH);
+
+  long duration = pulseIn(echoPin, HIGH);
   //distance_inches = microsSectionstoInches(duration);
-  distance_cm = microsSectionstoCentemers(duration);
+  long distance_cm = microsSectionstoCentemers(duration);
  /*  Serial.print(distance_inches);
   Serial.print(" in, "); */
 
@@ -246,4 +253,12 @@ void CheckObjectDistance(){
     MotorForward(100);
   }
 }
- 
+
+
+
+// Function to convert microseconds to centimeters
+long microsSectionstoCentemers(long duration) {
+  // Speed of sound in air is 343 meters per second or 29 microseconds per centimeter
+  return duration / 29 / 2;
+}
+
