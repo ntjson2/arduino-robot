@@ -1,15 +1,23 @@
 #include <Servo.h>
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
+#include <LiquidCrystal.h>
 
+
+int obsTimer = 0;
 // Ultrasonic setup ------------------------------------------
 const int trigPin = 9;
 const int echoPin = 10;
 long objDistance[] = {0,0}; // For comparing the current distance to the previous distance
 // The maximum distance the object can be from the sensor to be considered a verifiable object
-long maxObjDistance = 100; 
-long minObjDistance = 10;
+long maxObjDistance = 15; 
+long minObjDistance = 5; //inches
 bool stoppedFromObject = false; // Boolean to check if the object is too close to the sensor
+
+//Setup display ----------------------------------------
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
 
 
 // Servo setup ------------------------------------------
@@ -86,9 +94,13 @@ void initServo(){
 void setup() {
   // Fire up the serial monitor
   Serial.begin(9600);
+  // Initialize the display
+  lcd.begin(16, 2); // set up the LCD's number of columns and rows
+ 
   // Initialize the ultrasound sensor
   initUltrasound();
   //Initialize the servo with IR sensor attached.
+ 
   initServo();
   // Initialize the motors
   initMotors();  
@@ -111,7 +123,7 @@ void loop() {
       delay(500); */
 
   //resetIRSensors();
-  //CheckUltraSound();
+  CheckUltraSound();
 }
 
 
@@ -121,17 +133,6 @@ void MotorForward(uint8_t i){
   motorRight->run(FORWARD);
   motorLeft->setSpeed(motorSpeed);
   motorRight->setSpeed(motorSpeed);
-   
-  //Serial.println("Forwarding");
-
-/*  while(isForward){
-    motorLeft->setSpeed(motorSpeed);
-    motorRight->setSpeed(motorSpeed);
-    //Serial.print(motorSpeed);
-    Serial.println(": Moving Forward");
-    delay(1000);
-    MotorTurnLeft(motorSpeed);
-  }  */
 
 }
 
@@ -141,15 +142,8 @@ void MotorTurnLeft(uint8_t speed){
   motorRight->run(BACKWARD);// right forward
   motorLeft->setSpeed(speed);
   motorRight->setSpeed(speed);
-  //delay(500);
-
-  /*  for(int i=0; i<50; i++){
-    motorLeft->setSpeed(speed);
-    motorRight->setSpeed(speed);
-   // delay(turnDelay);
-    Serial.println("Turning Left");
-  } */
- 
+  lcd.clear();
+  lcd.print("UTURN");
   
 }
 
@@ -159,14 +153,7 @@ void MotorTurnRight(uint8_t speed){
   motorRight->run(FORWARD);// right forward
   motorLeft->setSpeed(speed);
   motorRight->setSpeed(speed);
-  //delay(500);
-
-  /*  for(int i=0; i<50; i++){
-    motorLeft->setSpeed(speed);
-    motorRight->setSpeed(speed);
-   // delay(turnDelay);
-    Serial.println("Turning right");
-  } */
+ 
 }
 
 
@@ -177,6 +164,18 @@ void MotorBackward(uint8_t i){
   motorLeft->setSpeed(i);
   motorRight->setSpeed(i);
 }
+
+
+//This code is to uturn
+void MotorUTurn(){
+  MotorTurnRight(120);
+  delay(1000);
+  MotorForward(0);
+  lcd.clear();
+  lcd.print("UTURN");
+}
+
+
 
 
 // Correct the movement of the robot if the IR sensors are blocked
@@ -317,19 +316,24 @@ void CheckUltraSound(){
 
 
   long duration = pulseIn(echoPin, HIGH);
-  //distance_inches = microsSectionstoInches(duration);
-  long distance_cm = microsSectionstoCentemers(duration);
- /*  Serial.print(distance_inches);
-  Serial.print(" in, "); */
+  long distance_inches = microsSectionstoInches(duration);
 
-  Serial.print(distance_cm);
-  Serial.print(" cm, ");
-  Serial.println();
-
-  //Set global variable objDistance to the distance in cm
+  //Set global variable objDistance to the distance in inches
   objDistance[0] = objDistance[1]; // Update the previous distance
-  objDistance[1] = distance_cm; // Update the current distance
+  objDistance[1] = distance_inches; // Update the current distance
+  CheckObjectDistance();
+
+  if (stoppedFromObject == true) {
+    obsTimer++;
+  }
+  if (obsTimer == 150) {
+    
+    MotorUTurn();
+    obsTimer = 0; //reset
+    stoppedFromObject == false;
+  }
   delay(100);
+
 }
 
 void CheckObjectDistance(){
@@ -354,19 +358,20 @@ void CheckObjectDistance(){
     
   // If the current object is future than the previous object, speed up the motors  
   if(objDistance[1] > objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
-    MotorForward(120);
+    MotorForward(100);
   }
   // If current object distance is less than the previous object distance, slow down the motors
   else if(objDistance[1] < objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
-    MotorForward(100);
+    MotorForward(75);
   }
 }
 
+long microsSectionstoInches(long microseconds){  
+   // Speed of sound in inches per microsecond
+  float inchesPerMicrosecond = 0.0133;
 
+  // Calculate the distance in inches
+  long distance_inches = (microseconds * inchesPerMicrosecond)/2;
 
-// Function to convert microseconds to centimeters
-long microsSectionstoCentemers(long duration) {
-  // Speed of sound in air is 343 meters per second or 29 microseconds per centimeter
-  return duration / 29 / 2;
+  return distance_inches;
 }
-
