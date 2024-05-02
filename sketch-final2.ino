@@ -18,8 +18,6 @@ bool stoppedFromObject = false; // Boolean to check if the object is too close t
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
-
-
 // Servo setup ------------------------------------------
 Servo servo;
 int angle = 1;
@@ -34,34 +32,22 @@ int analogPin2 = A2;
 int IRRight_Value =0;
 int analogPin3 = A3;
 int IRBackLeft_Value =0;
+bool isCrosswalk = false;
 
 // Int array to check IR sensor data, yellow vs white vs black, etc
 // ORDER: Right 0, Front 1, Left 2, BackLeft 3
-int IRBlocked[] = {1000, 1000, 1000, 1000};
+int IRBlocked[] = {0, 0, 0, 0};
 
 // Motor setup ------------------------------------------
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *motorLeft = AFMS.getMotor(1);
-Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
+Adafruit_DCMotor *motorLeft = AFMS.getMotor(4);
+Adafruit_DCMotor *motorRight = AFMS.getMotor(3);
 // Direction of the motors, Forward or Backward, 
 //Forward is the default, Forward = true, Backward = false
 bool isForward = true;
-
 // Motor speed, default is 150
-int motorSpeed = 250;
-
-
-// Basic previous direction states
-// Came from: 0 = start, 1 = right, 2 = left, 3 = left turn intersection, 
-// 4 = right turn intersection, 5 = crosswalk, 6 = stop, 7 = object, uturn = 8
-int prevState = 0;
-
-// Default delay for turn correction
-int turnDelay = 10;
-
-int yellowRange[] = {100, 200};
-int whiteInt = 200;
-
+int motorSpeed = 150;
+const int cruise = 100;
 
 // Function to initialize the ultrasound sensor
 void initUltrasound() {
@@ -75,7 +61,7 @@ void initMotors(){
   // Initialize the DC motors, start with the Adafruit_MotorShield
   AFMS.begin();
 
-  motorLeft->setSpeed(motorSpeed * 0.75) ;
+  motorLeft->setSpeed(motorSpeed);
   motorLeft->run(FORWARD);
   motorLeft->run(RELEASE);
 
@@ -97,45 +83,111 @@ void setup() {
   Serial.begin(9600);
   // Initialize the display
   lcd.begin(16, 2); // set up the LCD's number of columns and rows
-
-  
- 
   // Initialize the ultrasound sensor
   initUltrasound();
   //Initialize the servo with IR sensor attached.
- 
   initServo();
-
-  delay(3000);
   // Initialize the motors
   initMotors();  
-
- 
 }
 
 void loop() {
   // Check if there is a crosswalk with the servo
   checkIRSensors();
-   
-  CorrectMovementFromIRsensor();
-
- 
-  //CheckUltraSound();
+  
+  resetIRSensors();
+  CheckUltraSound();
 }
+
+void MotorTurnLeft(uint8_t speed){
+  motorLeft->run(FORWARD); // left backwards
+  motorRight->run(BACKWARD);// right forward
+  motorLeft->setSpeed(0);
+  motorRight->setSpeed(speed);
+  lcd.clear();
+  lcd.print("LEFT");
+}
+
+
+void MotorTurnRight(uint8_t speed){
+  motorLeft->run(FORWARD); // left backwards
+  motorRight->run(BACKWARD);// right forward
+  motorLeft->setSpeed(speed);
+  motorRight->setSpeed(0);
+  lcd.clear();
+  lcd.print("RIGHT");
+}
+
+// This code is to move the motors forward
+void MotorForward(uint8_t i){
+  motorLeft->run(FORWARD);
+  motorRight->run(BACKWARD);
+  motorLeft->setSpeed(i);
+  motorRight->setSpeed(i);
+  lcd.clear();
+  lcd.print("FORWARD");
+}
+
+// This code is to move the motors backward
+void MotorBackward(uint8_t i){
+  motorLeft->run(BACKWARD);
+  motorRight->run(FORWARD);
+  motorLeft->setSpeed(i);
+  motorRight->setSpeed(i);
+  lcd.clear();
+  lcd.print("BACKWARD");
+}
+
+//This code is to uturn
+void MotorUTurn(){
+  MotorTurnRight(120);
+  delay(1000);
+  MotorForward(0);
+  lcd.clear();
+  lcd.print("UTURN");
+}
+// This code is to control the servo by turning it out until it reaches 46 degrees, 
+// then checks the IR sensor to see if it is blocked. If it is blocked, it will turn back return true
+// showing there is a crosswalk. If it is not blocked, it will 
+bool VerifyCrosswalkWithServo(){  
+  for(angle=0; angle < 46; angle += 2){
+    servo.write(angle);
+      if(angle > 16){
+
+        IRFront_Value = analogRead(analogPin1);
+        if(IRFront_Value < 100){
+          Serial.println("IR Sensor is blocked");
+          obsTimer++;
+          return true;   
+        }
+      }
+    }
+  
+  delay(100);
+
+  for(angle=46; angle > 0; angle -=2){
+    servo.write(angle);
+  }
+
+  // IR is not triggered, return false
+  return false;
+}
+
 
 
 // Check the IR sensors to see if they are blocked, 
 //then set the IRBlocked array to true if one or many are blocked
 void checkIRSensors(){
-
- //delay(1000);
+  
+  int yellowRange[] = {100, 200};
+  int whiteInt = 200;
 
   IRRight_Value = analogRead(analogPin0);
   IRFront_Value = analogRead(analogPin1);
   IRLeft_Value = analogRead(analogPin2);
   IRBackLeft_Value = analogRead(analogPin3);
 
- /*  Serial.print("IR[0] Right Sensor: ");
+  Serial.print("IR[0] Right Sensor: ");
   Serial.println(IRRight_Value);
 
   Serial.print("IR[1] Front SERVO: ");
@@ -145,200 +197,79 @@ void checkIRSensors(){
   Serial.println(IRLeft_Value);
  
   Serial.print("IR[3] BackL Sensor: ");
-  Serial.println(IRBackLeft_Value); */
+  Serial.println(IRBackLeft_Value);
 
-
+ 
   if(IRRight_Value < whiteInt){
-    Serial.println(IRRight_Value);
     Serial.println("IR Right Sensor is blocked");
     IRBlocked[0]=IRRight_Value;
   }
   if(IRFront_Value < whiteInt){
-    Serial.println(IRRight_Value);
     Serial.println("IR Front SERVO is blocked");
     IRBlocked[1]=IRFront_Value;
   }
    if(IRLeft_Value < whiteInt){
-    Serial.println(IRLeft_Value);
     Serial.println("IR Left Sensor is blocked");
     IRBlocked[2]=IRLeft_Value;
   } 
   if(IRBackLeft_Value < whiteInt){
-    Serial.println(IRBackLeft_Value);
     Serial.println("IR Back Left Sensor is blocked");
     IRBlocked[3]=IRBackLeft_Value;
   }
 
-  // Serial.println("----------------------");
-   
+   Serial.println("----------------------");
+   Serial.println(". ");
+}
+
+// Reset the IR sensors to false
+void resetIRSensors(){
+  for(int i=0; i<3; i++){
+    IRBlocked[i]=false;
+  }
 }
 
 
 // Correct the movement of the robot if the IR sensors are blocked
 void CorrectMovementFromIRsensor(){
 
-  Serial.print("IR[1] Right Sensor: ");
-  Serial.print(IRBlocked[1]);
-  Serial.println(" . ");
-
-   // If servo  is blocked stop
-  if((IRBlocked[1] < whiteInt && IRBlocked[0] < whiteInt) && (IRBlocked[2] < whiteInt)){
+  // If all three sensors are blocked (front, left, right), stop, check for crosswalk
+  if(IRBlocked[0] && IRBlocked[1] && IRBlocked[2]){
     MotorForward(0);
-    Serial.println("Servo stop");
-    resetIRSensors();
+    isCrosswalk = VerifyCrosswalkWithServo();
+    if(isCrosswalk == false) {
+      MotorForward(150);
+      return;
+    } else if (isCrosswalk == true) {
+      for (int i = 1; i < 50; i++) {
+        delay(100);
+        obsTimer++;
+      }
 
-     //wait check for crosswalk
-    delay(10);
-   
-    //MotorUTurn();
+      obsTimer = 0; //reset
+      MotorForward(150); // move forward after waiting
+      return;
+    }
+  }
+
+  // If the left and right sensors are blocked keep moving straight ahead
+  if(IRBlocked[0] && IRBlocked[2]){
+    MotorForward(150);
     return;
   }
- 
-  // If the left and right sensors are blocked keep moving straight ahead
-  if((IRBlocked[0] < whiteInt) && (IRBlocked[2] < whiteInt)){
-    MotorForward(motorSpeed);
-    Serial.println("Moving Forward - Both Blocked");
-    resetIRSensors();
+
+  // If left is unblocked, turn left
+  if(!IRBlocked[0]){
+    MotorTurnLeft(150);
     return;
   }
 
   // If right is unblocked, turn right
-  if(IRBlocked[0] < whiteInt){
-    Serial.println("Turning Right");
-    MotorTurnRight(motorSpeed);   
-    resetIRSensors();
-    MotorForward(motorSpeed);
-    return;
-  } 
-
-   // If left is unblocked, turn left
-  if(IRBlocked[2] < whiteInt){
-    MotorTurnLeft(motorSpeed * 0.75);
-    Serial.println("Turning Left");
-    resetIRSensors();
-    MotorForward(motorSpeed);
+  if(!IRBlocked[2]){
+    MotorTurnRight(150);
     return;
   }
-  
-   MotorForward(motorSpeed);
-   //Serial.println("Moving Forward - Default");
-   resetIRSensors();
-    
-
-/* 
-  // If all three sensors are blocked (front, left, right), stop, check for crosswalk
-  if(IRBlocked[0] && IRBlocked[1] && IRBlocked[2]){
-    MotorForward(0);
-    VerifyCrosswalkWithServo();
-    Serial.println("Crosswalk");
-    return;
-  }
-  */ 
-
-
-}
-
-
-// This code is to move the motors forward
-void MotorForward(uint8_t i){
-  motorLeft->run(BACKWARD);
-  motorRight->run(FORWARD);
-  motorLeft->setSpeed(i * 0.75);
-  motorRight->setSpeed(i);
-}
-
-
-void MotorTurnLeft(uint8_t speed){
-  
-  motorLeft->run(BACKWARD); // left backwards
-  motorRight->run(BACKWARD);// right forward
  
-  motorLeft->setSpeed(speed * 0.75);
-  motorRight->setSpeed(speed);
-  lcd.clear();
-  lcd.print("UTURN");
-  delay(turnDelay);  
 }
-
-
-void MotorTurnRight(uint8_t speed){
-
-  motorLeft->run(FORWARD); // left backwards
-  motorRight->run(FORWARD);// right forward  
- 
-  motorLeft->setSpeed(speed * 0.75);
-  motorRight->setSpeed(speed);
-  delay(turnDelay); 
-}
-
-
-// This code is to move the motors forward
-void MotorBackward(uint8_t i){
-  motorLeft->run(BACKWARD);
-  motorRight->run(FORWARD);
-  motorLeft->setSpeed(i);
-  motorRight->setSpeed(i);
-  delay(turnDelay);
-}
-
-
-//This code is to uturn
-void MotorUTurn(){
-  Serial.println("UTURN");
-  for(int i=0; i<5; i++){
-    MotorTurnRight(motorSpeed);
-  }
-
-  delay(1000);
-  MotorForward(0);
-  lcd.clear();
-  lcd.print("UTURN");
-}
-
-
-
-
-
-// This code is to control the servo by turning it out until it reaches 46 degrees, 
-// then checks the IR sensor to see if it is blocked. If it is blocked, it will turn back return true
-// showing there is a crosswalk. If it is not blocked, it will 
-// return false showing there is no crosswalk.
-bool VerifyCrosswalkWithServo(){  
-  for(angle=0; angle < 46; angle += 2){
-    servo.write(angle);
-      if(angle > 16){
-
-        IRFront_Value = analogRead(analogPin1);
-        if(IRFront_Value < 100){
-          Serial.println("IR Sensor is blocked");
-          return true;   
-        }
-      }
-    //   
-    delay(15);
-    }
-  
-
-  for(angle=46; angle > 0; angle -=2){
-    servo.write(angle);
-    delay(15);
-  }
-
-  // IR is not triggered, return false
-  return false;
-}
-
-
-
-
-// Reset the IR sensors to false
-void resetIRSensors(){
-  for(int i=0; i<4; i++){
-    IRBlocked[i]=1000;
-  }
-}
-
-
 
 void CheckUltraSound(){
 
@@ -356,18 +287,15 @@ void CheckUltraSound(){
   objDistance[0] = objDistance[1]; // Update the previous distance
   objDistance[1] = distance_inches; // Update the current distance
   CheckObjectDistance();
-
   if (stoppedFromObject == true) {
     obsTimer++;
   }
-  if (obsTimer == 150) {
-
+  if (obsTimer == 100) {
     MotorUTurn();
     obsTimer = 0; //reset
     stoppedFromObject == false;
   }
   delay(100);
-
 }
 
 void CheckObjectDistance(){
