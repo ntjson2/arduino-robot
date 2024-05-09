@@ -1,16 +1,21 @@
 #include <Servo.h>
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
-#include <LiquidCrystal_I2C.h>
 
+int obsTimer = 0;
 // Ultrasonic setup ------------------------------------------
-const int trigPin = 9;
-const int echoPin = 10;
+const int trigPin = 8;
+const int echoPin = 9;
 long objDistance[] = {0,0}; // For comparing the current distance to the previous distance
 // The maximum distance the object can be from the sensor to be considered a verifiable object
-long maxObjDistance = 100; 
-long minObjDistance = 10;
+long maxObjDistance = 15; 
+long minObjDistance = 5; //inches
 bool stoppedFromObject = false; // Boolean to check if the object is too close to the sensor
+
+//Setup display ----------------------------------------
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
 
 
 // Servo setup ------------------------------------------
@@ -19,56 +24,29 @@ int angle = 1;
 
 // IR setup ------------------------------------------
 // IR dectectors IRLeft_Value, IRFront_Value, IRRight_Value
-int analogPin1 = A1;
+int analogPin0 = A0;
 int IRLeft_Value =0;
-int analogPin2 = A2;
+int analogPin1 = A1;
 int IRFront_Value =0;
-int analogPin3 = A3;
+int analogPin2 = A2;
 int IRRight_Value =0;
-int analogPin4 = A4;
+int analogPin3 = A4;
 int IRBackRight_Value =0;
 
 // Int array to check IR sensor data, yellow vs white vs black, etc
-int IRBlocked[] = {0, 0, 0, 0};
+int[] IRBlocked = {0, 0, 0, 0};
 
 // Motor setup ------------------------------------------
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *motorLeft = AFMS.getMotor(4);
-Adafruit_DCMotor *motorRight = AFMS.getMotor(3);
+Adafruit_DCMotor *motorLeft = AFMS.getMotor(1);
+Adafruit_DCMotor *motorRight = AFMS.getMotor(2);
 // Direction of the motors, Forward or Backward, 
 //Forward is the default, Forward = true, Backward = false
 bool isForward = true;
+
 // Motor speed, default is 150
 int motorSpeed = 150;
 
-
-// Function to initialize the ultrasound sensor
-void initUltrasound() {
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-}
-
-
-// Initialize the motors
-void initMotors(){
-  // Initialize the DC motors, start with the Adafruit_MotorShield
-  AFMS.begin();
-
-  motorLeft->setSpeed(motorSpeed);
-  motorLeft->run(FORWARD);
-  motorLeft->run(RELEASE);
-
-  motorRight->setSpeed(motorSpeed);
-  motorRight->run(BACKWARD);
-  motorRight->run(RELEASE);  
-}
-
-
-// This code is to control the servo 
-void initServo(){
-  servo.attach(10);
-  servo.write(angle);
-}
 
 
 void setup() {
@@ -94,37 +72,56 @@ void loop() {
 }
 
 
+// Initialize the motors
+void initMotors(){
+  // Initialize the DC motors, start with the Adafruit_MotorShield
+  AFMS.begin();
+
+  motorLeft->setSpeed(motorSpeed);
+  motorLeft->run(FORWARD);
+  motorLeft->run(RELEASE);
+
+  motorRight->setSpeed(motorSpeed);
+  motorRight->run(BACKWARD);
+  motorRight->run(RELEASE);  
+}
 
 
 void MotorTurnLeft(uint8_t speed){
   motorLeft->run(FORWARD); // left backwards
-  motorRight->run(BACKWARD);// right forward
-  motorLeft->setSpeed(0);
+  motorRight->run(FORWARD);// right forward  
+ 
+  motorLeft->setSpeed(speed * 0.85);
   motorRight->setSpeed(speed);
+  lcd.clear();
+  lcd.print("UTURN");
+  delay(turnDelay);  
 }
 
 
 void MotorTurnRight(uint8_t speed){
-  motorLeft->run(FORWARD); // left backwards
+   motorLeft->run(BACKWARD); // left backwards
   motorRight->run(BACKWARD);// right forward
-  motorLeft->setSpeed(speed);
-  motorRight->setSpeed(0);
+  motorLeft->setSpeed(speed * 0.85);
+  motorRight->setSpeed(speed);
+  delay(turnDelay); 
 }
 
-// This code is to move the motors forward
-void MotorForward(uint8_t i){
-  motorLeft->run(FORWARD);
-  motorRight->run(BACKWARD);
-  motorLeft->setSpeed(i);
-  motorRight->setSpeed(i);
-}
 
 // This code is to move the motors forward
 void MotorBackward(uint8_t i){
   motorLeft->run(BACKWARD);
   motorRight->run(FORWARD);
-  motorLeft->setSpeed(i);
+  motorLeft->setSpeed(i * 0.85);
   motorRight->setSpeed(i);
+  delay(turnDelay);
+}
+
+
+// This code is to control the servo 
+void initServo(){
+  servo.attach(10);
+  servo.write(angle);
 }
 
 // This code is to control the servo by turning it out until it reaches 46 degrees, 
@@ -136,12 +133,11 @@ bool VerifyCrosswalkWithServo(){
     servo.write(angle);
       if(angle > 16){
 
-        IRFront_Value = analogRead(analogPin2);
-        if(IRFront_Value < 100){
-          Serial.println("IR Sensor is blocked");
-          return true;   
-        }
-      }
+      IRFront_Value = analogRead(analogPin2);
+      if(IRFront_Value < 100){
+        Serial.println("IR Sensor is blocked");
+        return true;   
+    }
     delay(15);
     }
   
@@ -157,44 +153,11 @@ bool VerifyCrosswalkWithServo(){
 
 
 
-// Check the IR sensors to see if they are blocked, 
-//then set the IRBlocked array to true if one or many are blocked
-void checkIRSensors(){
-  
-  int yellowRange[] = {100, 200};
-
-  IRLeft_Value = analogRead(analogPin1);
-  IRFront_Value = analogRead(analogPin2);
-  IRRight_Value = analogRead(analogPin3);
-  IRBackRight_Value = analogRead(analogPin4);
-
-  Serial.println(IRLeft_Value);
-  Serial.println(IRFront_Value);
-  Serial.println(IRRight_Value);
-  Serial.println(IRBackRight_Value);
-
-  if(IRLeft_Value < 100){
-    Serial.println("IR Left Sensor is blocked");
-    IRBlocked[0]=IRLeft_Value;
-  }
-  if(IRFront_Value < 100){
-    Serial.println("IR Front Sensor is blocked");
-    IRBlocked[1]=IRFront_Value;
-  }
-  if(IRRight_Value < 100){
-    Serial.println("IR Right Sensor is blocked");
-    IRBlocked[2]=IRRight_Value;
-  }
-  if(IRBackRight_Value < 100){
-    Serial.println("IR Back Right Sensor is blocked");
-    IRBlocked[2]=IRBackRight_Value;
-  }
-}
 
 // Reset the IR sensors to false
 void resetIRSensors(){
-  for(int i=0; i<3; i++){
-    IRBlocked[i]=false;
+  for(int i=0; i<4; i++){
+    IRBlocked[i]=1000;
   }
 }
 
@@ -208,10 +171,10 @@ void CheckUltraSound(){
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
 
-
-  long duration = pulseIn(echoPin, HIGH);
+  long duration, distance_inches, distance_cm;
+  duration = pulseIn(echoPin, HIGH);
   //distance_inches = microsSectionstoInches(duration);
-  long distance_cm = microsSectionstoCentemers(duration);
+  distance_cm = microsSectionstoCentemers(duration);
  /*  Serial.print(distance_inches);
   Serial.print(" in, "); */
 
@@ -221,8 +184,22 @@ void CheckUltraSound(){
 
   //Set global variable objDistance to the distance in cm
   objDistance[0] = objDistance[1]; // Update the previous distance
-  objDistance[1] = distance_cm; // Update the current distance
+  objDistance[1] = distance_inches; // Update the current distance
+  Serial.println(distance_inches);
+   Serial.println(" inches");
+  CheckObjectDistance();
+
+  if (stoppedFromObject == true) {
+    obsTimer++;
+  }
+  if (obsTimer == 100) {
+
+    MotorUTurn();
+    obsTimer = 0; //reset
+    stoppedFromObject == false;
+  }
   delay(100);
+
 }
 
 void CheckObjectDistance(){
@@ -247,19 +224,11 @@ void CheckObjectDistance(){
     
   // If the current object is future than the previous object, speed up the motors  
   if(objDistance[1] > objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
-    MotorForward(120);
+    MotorForward(100);
   }
   // If current object distance is less than the previous object distance, slow down the motors
   else if(objDistance[1] < objDistance[0] && objDistance[1] < maxObjDistance && objDistance[1] > 1){
-    MotorForward(100);
+    MotorForward(75);
   }
 }
-
-
-
-// Function to convert microseconds to centimeters
-long microsSectionstoCentemers(long duration) {
-  // Speed of sound in air is 343 meters per second or 29 microseconds per centimeter
-  return duration / 29 / 2;
-}
-
+ 
