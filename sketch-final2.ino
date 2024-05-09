@@ -1,6 +1,7 @@
 #include <Servo.h>
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
+#include <LiquidCrystal.h>
 
 int obsTimer = 0;
 // Ultrasonic setup ------------------------------------------
