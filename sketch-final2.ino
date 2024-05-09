@@ -1,6 +1,7 @@
 #include <Servo.h>
 #include <Wire.h>
 #include <Adafruit_MotorShield.h>
+#include <LiquidCrystal_I2C.h>
 
 // Ultrasonic setup ------------------------------------------
 const int trigPin = 9;
